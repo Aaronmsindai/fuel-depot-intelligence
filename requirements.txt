@@ -2,3 +2,6 @@ streamlit
 pandas
 plotly
 statsmodels
+shap
+scikit-learn
+matplotlib
