@@ -88,3 +88,41 @@ fig.update_layout(title=f"{fuel_selection} Sales Forecast", xaxis_title="Date", 
 st.plotly_chart(fig, use_container_width=True)
 
 st.caption("Dashboard created by Aaron Msindai | Powered by Streamlit, Pandas, and Statsmodels")
+st.divider()
+st.subheader("🤖 Explainable AI: Why did the model predict this?")
+st.markdown("Using SHAP (SHapley Additive exPlanations) to understand which factors drive Diesel sales the most.")
+
+import shap
+import matplotlib.pyplot as plt
+from sklearn.ensemble import HistGradientBoostingRegressor
+
+# 1. Prepare data for Gradient Boosting
+# We will specifically look at Diesel for this explanation
+diesel_sales = sales_df[sales_df['Fuel_Type'] == 'Diesel'].copy()
+daily_sales = diesel_sales.groupby('Date')['Volume_Liters'].sum().reset_index()
+daily_sales = daily_sales.sort_values('Date')
+
+# Feature Engineering
+daily_sales['Day_of_Week'] = daily_sales['Date'].dt.day_of_week
+daily_sales['Month'] = daily_sales['Date'].dt.month
+daily_sales['Is_Weekend'] = daily_sales['Day_of_Week'].apply(lambda x: 1 if x >= 5 else 0)
+daily_sales['Yesterday_Sales'] = daily_sales['Volume_Liters'].shift(1)
+daily_sales['Last_Week_Sales'] = daily_sales['Volume_Liters'].shift(7)
+daily_sales = daily_sales.dropna()
+
+features = ['Day_of_Week', 'Month', 'Is_Weekend', 'Yesterday_Sales', 'Last_Week_Sales']
+X = daily_sales[features]
+y = daily_sales['Volume_Liters']
+
+# 2. Train the model
+model_gb = HistGradientBoostingRegressor(max_iter=100, learning_rate=0.1, max_depth=3, random_state=42)
+model_gb.fit(X, y)
+
+# 3. Generate SHAP plot
+with st.spinner("Calculating SHAP values (this takes a few seconds)..."):
+    explainer = shap.Explainer(model_gb, X)
+    shap_values = explainer(X)
+    
+    fig_shap, ax = plt.subplots(figsize=(10, 5))
+    shap.summary_plot(shap_values, X, show=False)
+    st.pyplot(fig_shap)
